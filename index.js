@@ -2,14 +2,16 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const express = require('express');
 
-// Uptime üçün server
 const app = express();
 app.get('/', (req, res) => res.status(200).send('Bot is active!'));
 app.listen(process.env.PORT || 10000);
 
-// Gemini AI konfiqurasiyası
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// API açarını birbaşa oxu (yoxla gör process.env-də varmı)
+const apiKey = process.env.GEMINI_API_KEY;
+const genAI = new GoogleGenerativeAI(apiKey);
+
+// Model adını "gemini-1.5-flash" yerinə daha stabil olan "gemini-pro" etdik
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 const client = new Client({
     intents: [
@@ -17,6 +19,10 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ]
+});
+
+client.once('ready', () => {
+    console.log(`Bot uğurla işə düşdü: ${client.user.tag}`);
 });
 
 client.on('messageCreate', async (message) => {
@@ -34,7 +40,7 @@ client.on('messageCreate', async (message) => {
         message.reply(text.length > 2000 ? text.substring(0, 1999) : text);
     } catch (error) {
         console.error('Gemini Error:', error);
-        message.reply('AI cavab verə bilmədi. Açarın düzgün olduğundan əmin olun.');
+        message.reply('AI cavab verə bilmədi. Zəhmət olmasa API açarını yoxla.');
     }
 });
 
