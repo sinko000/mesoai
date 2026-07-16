@@ -12,22 +12,16 @@ const {
 } = require('discord.js');
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 
 const CONFIG = {
     SUPPORT_ROLE: '1527393296966746244',
     TICKET_CATEGORY_ID: '1527402873292591204',
-    LOG_CHANNEL_ID: 'BURA_LOG_KANAL_ID-NI_QOY' // Ticket arxivinin gedəcəyi kanal ID-si
+    LOG_CHANNEL_ID: 'BURA_LOG_KANAL_ID-NI_QOY' 
 };
 
-client.once('clientReady', (c) => {
-    console.log(`Bot uğurla işə düşdü: ${c.user.tag}`);
-});
+client.once('clientReady', (c) => console.log(`Bot aktivdir: ${c.user.tag}`));
 
 // Setup
 client.on('messageCreate', async (message) => {
@@ -43,37 +37,24 @@ client.on('messageCreate', async (message) => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-    // Düymə (Ticket açmaq və ya Bağlamaq)
     if (interaction.isButton()) {
         if (interaction.customId.startsWith('ticket_')) {
-            const type = interaction.customId.replace('ticket_', '');
-            const modal = new ModalBuilder().setCustomId(`modal_${type}`).setTitle(`${type.toUpperCase()} Ticket`);
+            const modal = new ModalBuilder().setCustomId(`modal_${interaction.customId.replace('ticket_', '')}`).setTitle('Support Ticket');
             modal.addComponents(new ActionRowBuilder().addComponents(
                 new TextInputBuilder().setCustomId('user_input').setLabel('Describe your request:').setStyle(TextInputStyle.Paragraph).setRequired(true)
             ));
             await interaction.showModal(modal);
-        } 
-        else if (interaction.customId === 'close_ticket') {
-            await interaction.reply('Saving transcript and closing...');
-            
-            // Mesajları yığ və log kanalına göndər
+        } else if (interaction.customId === 'close_ticket') {
+            await interaction.reply('Transcript is being saved...');
             const messages = await interaction.channel.messages.fetch({ limit: 100 });
             const transcript = messages.reverse().map(m => `[${m.author.tag}]: ${m.content}`).join('\n');
             const logChannel = await interaction.guild.channels.fetch(CONFIG.LOG_CHANNEL_ID);
             
-            await logChannel.send({
-                content: `**Ticket Closed:** ${interaction.channel.name}\n\`\`\`text\n${transcript}\n\`\`\``
-            });
-
-            setTimeout(() => interaction.channel.delete().catch(console.error), 5000);
+            await logChannel.send({ content: `**Ticket Closed:** ${interaction.channel.name}\n\`\`\`text\n${transcript}\n\`\`\`` });
+            setTimeout(() => interaction.channel.delete().catch(console.error), 3000);
         }
-    } 
-    
-    // Modal submit
-    else if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_')) {
+    } else if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_')) {
         const type = interaction.customId.replace('modal_', '');
-        const userInput = interaction.fields.getTextInputValue('user_input');
-
         const ticketChannel = await interaction.guild.channels.create({
             name: `${type}-${interaction.user.username}`,
             type: ChannelType.GuildText,
@@ -85,16 +66,11 @@ client.on('interactionCreate', async (interaction) => {
             ]
         });
 
-        const closeRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('close_ticket').setLabel('Close Ticket').setStyle(ButtonStyle.Danger)
-        );
-
         await ticketChannel.send({ 
             content: `<@&${CONFIG.SUPPORT_ROLE}> | Ticket created by ${interaction.user}`, 
-            embeds: [new EmbedBuilder().setTitle(`New ${type.toUpperCase()} Ticket`).setDescription(userInput).setColor(0x00FF00)],
-            components: [closeRow]
+            embeds: [new EmbedBuilder().setTitle(`New ${type.toUpperCase()} Ticket`).setDescription(interaction.fields.getTextInputValue('user_input')).setColor(0x00FF00)],
+            components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('close_ticket').setLabel('Close Ticket').setStyle(ButtonStyle.Danger))]
         });
-
         await interaction.reply({ content: `✅ Created: ${ticketChannel}`, ephemeral: true });
     }
 });
