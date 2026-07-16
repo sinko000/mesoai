@@ -1,15 +1,14 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const express = require('express');
 
-// Uptime üçün server
 const app = express();
-app.get('/', (req, res) => res.status(200).send('AI Bot is active!'));
+app.get('/', (req, res) => res.status(200).send('ChatGPT Bot is active!'));
 app.listen(process.env.PORT || 10000);
 
-// Gemini AI qurulumu - Stabil model istifadə edirik
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" }); 
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
 
 const client = new Client({
     intents: [
@@ -19,37 +18,30 @@ const client = new Client({
     ]
 });
 
-client.once('ready', () => {
-    console.log(`Bot is online as ${client.user.tag}`);
-});
-
 client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-    
-    // Yalnız !ai ilə başlayan mesajları oxusun
-    if (!message.content.startsWith('!ai ')) return;
+    if (message.author.bot || !message.content.startsWith('!ai ')) return;
 
     const prompt = message.content.slice(4).trim();
-    if (!prompt) return message.reply('Please provide a message for the AI.');
+    if (!prompt) return;
 
     try {
-        message.channel.sendTyping(); 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+        message.channel.sendTyping();
+        const completion = await openai.chat.completions.create({
+            messages: [{ role: "user", content: prompt }],
+            model: "gpt-4o-mini", // Ən sürətli və ucuz model
+        });
 
-        // Cavab çox uzundursa böl
-        if (text.length > 2000) {
-            const chunks = text.match(/.{1,2000}/g);
-            for (const chunk of chunks) {
-                await message.reply(chunk);
-            }
+        const reply = completion.choices[0].message.content;
+        
+        if (reply.length > 2000) {
+            const chunks = reply.match(/.{1,2000}/g);
+            for (const chunk of chunks) await message.reply(chunk);
         } else {
-            await message.reply(text);
+            await message.reply(reply);
         }
     } catch (error) {
-        console.error('AI Error:', error);
-        message.reply('Sorry, I encountered an error while processing your request.');
+        console.error('OpenAI Error:', error);
+        message.reply('Sualınızı emal edərkən xəta baş verdi.');
     }
 });
 
