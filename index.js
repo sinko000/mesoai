@@ -3,11 +3,12 @@ const OpenAI = require('openai');
 const express = require('express');
 
 const app = express();
-app.get('/', (req, res) => res.status(200).send('ChatGPT Bot is active!'));
+app.get('/', (req, res) => res.status(200).send('Bot is active!'));
 app.listen(process.env.PORT || 10000);
 
+// OpenAI konfiqurasiyası
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY, // Render-dəki dəyişənin adı bu olmalıdır!
 });
 
 const client = new Client({
@@ -28,20 +29,14 @@ client.on('messageCreate', async (message) => {
         message.channel.sendTyping();
         const completion = await openai.chat.completions.create({
             messages: [{ role: "user", content: prompt }],
-            model: "gpt-4o-mini", // Ən sürətli və ucuz model
+            model: "gpt-4o-mini",
         });
 
         const reply = completion.choices[0].message.content;
-        
-        if (reply.length > 2000) {
-            const chunks = reply.match(/.{1,2000}/g);
-            for (const chunk of chunks) await message.reply(chunk);
-        } else {
-            await message.reply(reply);
-        }
+        message.reply(reply.length > 2000 ? reply.substring(0, 1999) : reply);
     } catch (error) {
         console.error('OpenAI Error:', error);
-        message.reply('Sualınızı emal edərkən xəta baş verdi.');
+        message.reply('API açarında və ya sorğuda xəta var. Xahiş edirəm API açarınızı yoxlayın.');
     }
 });
 
