@@ -5,68 +5,127 @@ const {
 } = require('discord.js');
 
 const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
 });
 
-// Konfiqurasiya
 const CONFIG = {
     SUPPORT_ROLE: '1527393296966746244',
-    TICKET_CHANNEL: '1526882844947775579'
+    TICKET_CATEGORY_ID: '1526882844947775579'
 };
 
-// 1. Ticket menyusunu göndərən funksiya (Bunu istədiyin kanala bir dəfə göndər)
-async function sendTicketMenu(channel) {
-    const row = new ActionRowBuilder()
-        .addComponents(
-            new ButtonBuilder().setCustomId('ticket_report').setLabel('Report').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId('ticket_suggestion').setLabel('Suggestion').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId('ticket_question').setLabel('Question').setStyle(ButtonStyle.Secondary)
-        );
-    
-    await channel.send({ content: 'Select an option to open a ticket:', components: [row] });
-}
+// Bot işə düşəndə
+client.once('ready', () => {
+    console.log(`Bot uğurla işə düşdü: ${client.user.tag}`);
+});
 
-// 2. Düymə basılanda Modal açılması
-client.on('interactionCreate', async interaction => {
-    if (interaction.isButton()) {
+// Admin üçün mesajı göndərmək komandası (!setup)
+client.on('messageCreate', async (message) => {
+    if (message.content === '!setup') {
+        // Təhlükəsizlik üçün: Yalnız adminlər edə bilsin deyə yoxlaya bilərsən
+        // if (!message.member.permissions.has('Administrator')) return;
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('ticket_report')
+                .setLabel('Report')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId('ticket_suggestion')
+                .setLabel('Suggestion')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('ticket_question')
+                .setLabel('Question')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        const embed = new EmbedBuilder()
+            .setTitle('🎫 Support Tickets')
+            .setDescription('Please select the category of your request below to open a ticket.')
+            .setColor(0x2B2D31);
+
+        await message.channel.send({ embeds: [embed], components: [row] });
+        await message.delete().catch(() => {}); // Komandanı silir
+    }
+});
+
+// Düymə və Modal əməliyyatları
+client.on('interactionCreate', async (interaction) => {
+    // 1. Düyməyə basıldıqda Modal açılır
+    if (interaction.isButton() && interaction.customId.startsWith('ticket_')) {
         const type = interaction.customId.replace('ticket_', '');
-        const modal = new ModalBuilder().setCustomId(`modal_${type}`).setTitle(`${type.toUpperCase()} Ticket`);
         
+        const modal = new ModalBuilder()
+            .setCustomId(`modal_${type}`)
+            .setTitle(`${type.charAt(0).toUpperCase() + type.slice(1)} Ticket`);
+
+        // Hər düymə üçün fərqli sual məntiqi
+        let questionLabel = 'Please describe your request:';
+        if (type === 'report') questionLabel = 'Who are you reporting and why?';
+        else if (type === 'suggestion') questionLabel = 'What is your suggestion?';
+        else if (type === 'question') questionLabel = 'What is your question?';
+
         const input = new TextInputBuilder()
-            .setCustomId('ticket_input')
-            .setLabel('Please describe your request:')
+            .setCustomId('user_input')
+            .setLabel(questionLabel)
             .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true);
-            
+            .setRequired(true)
+            .setMaxLength(1000);
+
         modal.addComponents(new ActionRowBuilder().addComponents(input));
         await interaction.showModal(modal);
     } 
     
-    // 3. Modal göndəriləndə Ticket kanalının yaradılması
-    else if (interaction.isModalSubmit()) {
-        const [_, type] = interaction.customId.split('_');
-        const content = interaction.fields.getTextInputValue('ticket_input');
+    // 2. Modal göndərildikdə Ticket yaradılır
+    else if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_')) {
+        const type = interaction.customId.replace('modal_', '');
+        const userInput = interaction.fields.getTextInputValue('user_input');
         const guild = interaction.guild;
 
-        const ticketChannel = await guild.channels.create({
-            name: `${type}-${interaction.user.username}`,
-            type: ChannelType.GuildText,
-            parent: '1526882844947775579', // Parent ID əgər varsa
-            permissionOverwrites: [
-                { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel] },
-                { id: CONFIG.SUPPORT_ROLE, allow: [PermissionsBitField.Flags.ViewChannel] }
-            ]
-        });
+        try {
+            const ticketChannel = await guild.channels.create({
+                name: `${type}-${interaction.user.username}`,
+                type: ChannelType.GuildText,
+                parent: CONFIG.TICKET_CATEGORY_ID,
+                permissionOverwrites: [
+                    {
+                        id: guild.id,
+                        deny: [PermissionsBitField.Flags.ViewChannel] // Hamıya bağlı
+                    },
+                    {
+                        id: interaction.user.id,
+                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] // Açan adama açıq
+                    },
+                    {
+                        id: CONFIG.SUPPORT_ROLE,
+                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] // Rol üçün açıq
+                    }
+                ]
+            });
 
-        const embed = new EmbedBuilder()
-            .setTitle(`New ${type.toUpperCase()} Ticket`)
-            .setDescription(`**User:** ${interaction.user}\n**Request:** ${content}`)
-            .setColor(0x0099FF);
+            const embed = new EmbedBuilder()
+                .setTitle(`New ${type.toUpperCase()} Ticket`)
+                .setDescription(`**User:** ${interaction.user}\n**Details:**\n${userInput}`)
+                .setColor(0x00FF00)
+                .setTimestamp();
 
-        await ticketChannel.send({ content: `<@&${CONFIG.SUPPORT_ROLE}>`, embeds: [embed] });
-        await interaction.reply({ content: `Ticket created: ${ticketChannel}`, ephemeral: true });
+            // Yeni kanala mesaj və rolu etiketləmə
+            await ticketChannel.send({ 
+                content: `<@&${CONFIG.SUPPORT_ROLE}> | Ticket created by ${interaction.user}`, 
+                embeds: [embed] 
+            });
+
+            await interaction.reply({ content: `✅ Your ticket has been created: ${ticketChannel}`, ephemeral: true });
+
+        } catch (error) {
+            console.error('Ticket yaratma xətası:', error);
+            await interaction.reply({ content: '❌ There was an error creating your ticket. Please make sure the Category ID is correct.', ephemeral: true });
+        }
     }
 });
 
-client.login('TOKEN');
+client.login(process.env.TOKEN);
