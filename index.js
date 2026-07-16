@@ -69,4 +69,4 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-client.login('TOKENIN');
+client.login('TOKEN');
