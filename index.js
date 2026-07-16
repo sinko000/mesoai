@@ -17,8 +17,7 @@ const client = new Client({
 
 const CONFIG = {
     SUPPORT_ROLE: '1527393296966746244',
-    TICKET_CATEGORY_ID: '1527402873292591204',
-    LOG_CHANNEL_ID: 'BURA_LOG_KANAL_ID-NI_QOY' 
+    TICKET_CATEGORY_ID: '1527402873292591204',   
 };
 
 client.once('clientReady', (c) => console.log(`Bot aktivdir: ${c.user.tag}`));
