@@ -19,7 +19,6 @@ const client = new Client({
     ]
 });
 
-// YENİLƏNMİŞ ID-LƏR
 const CONFIG = {
     SUPPORT_ROLE: '1527393296966746244',
     TICKET_CATEGORY_ID: '1527402873292591204'
@@ -29,6 +28,7 @@ client.once('clientReady', (c) => {
     console.log(`Bot uğurla işə düşdü: ${c.user.tag}`);
 });
 
+// Setup Komandası
 client.on('messageCreate', async (message) => {
     if (message.content === '!setup') {
         const row = new ActionRowBuilder().addComponents(
@@ -48,23 +48,34 @@ client.on('messageCreate', async (message) => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-    if (interaction.isButton() && interaction.customId.startsWith('ticket_')) {
-        const type = interaction.customId.replace('ticket_', '');
-        const modal = new ModalBuilder()
-            .setCustomId(`modal_${type}`)
-            .setTitle(`${type.charAt(0).toUpperCase() + type.slice(1)} Ticket`);
+    // 1. Düyməyə basıldıqda
+    if (interaction.isButton()) {
+        if (interaction.customId.startsWith('ticket_')) {
+            const type = interaction.customId.replace('ticket_', '');
+            const modal = new ModalBuilder()
+                .setCustomId(`modal_${type}`)
+                .setTitle(`${type.charAt(0).toUpperCase() + type.slice(1)} Ticket`);
 
-        const input = new TextInputBuilder()
-            .setCustomId('user_input')
-            .setLabel('Please describe your request:')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true)
-            .setMaxLength(1000);
+            const input = new TextInputBuilder()
+                .setCustomId('user_input')
+                .setLabel('Please describe your request:')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(true)
+                .setMaxLength(1000);
 
-        modal.addComponents(new ActionRowBuilder().addComponents(input));
-        await interaction.showModal(modal);
+            modal.addComponents(new ActionRowBuilder().addComponents(input));
+            await interaction.showModal(modal);
+        } 
+        // 2. Close Düyməsi
+        else if (interaction.customId === 'close_ticket') {
+            await interaction.reply('Ticket is closing in 5 seconds...');
+            setTimeout(async () => {
+                await interaction.channel.delete().catch(console.error);
+            }, 5000);
+        }
     } 
     
+    // 3. Modal göndəriləndə
     else if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_')) {
         const type = interaction.customId.replace('modal_', '');
         const userInput = interaction.fields.getTextInputValue('user_input');
@@ -82,18 +93,24 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
+            // Close Düyməsini yaradırıq
+            const closeRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('close_ticket').setLabel('Close Ticket').setStyle(ButtonStyle.Danger)
+            );
+
             await ticketChannel.send({ 
                 content: `<@&${CONFIG.SUPPORT_ROLE}> | Ticket created by ${interaction.user}`, 
                 embeds: [new EmbedBuilder()
                     .setTitle(`New ${type.toUpperCase()} Ticket`)
                     .setDescription(`**User:** ${interaction.user}\n**Details:**\n${userInput}`)
-                    .setColor(0x00FF00)] 
+                    .setColor(0x00FF00)],
+                components: [closeRow] 
             });
 
             await interaction.reply({ content: `✅ Your ticket has been created: ${ticketChannel}`, ephemeral: true });
         } catch (error) {
             console.error('Ticket yaratma xətası:', error);
-            await interaction.reply({ content: '❌ Error: Could not create channel. Please check category ID and bot permissions.', ephemeral: true });
+            await interaction.reply({ content: '❌ Error: Could not create channel. Check permissions.', ephemeral: true });
         }
     }
 });
