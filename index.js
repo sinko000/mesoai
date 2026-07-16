@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 10000;
 
-app.get('/', (req, res) => res.send('Bot is online!'));
+app.get('/', (req, res) => res.send('Ticket bot is active!'));
 app.listen(port, () => console.log(`Server ${port} portunda aktivdir.`));
 
 const { 
@@ -19,12 +19,12 @@ const client = new Client({
     ]
 });
 
+// YENİLƏNMİŞ ID-LƏR
 const CONFIG = {
     SUPPORT_ROLE: '1527393296966746244',
-    TICKET_CATEGORY_ID: '1526882844947775579'
+    TICKET_CATEGORY_ID: '1527402873292591204'
 };
 
-// 'ready' əvəzinə 'clientReady' istifadə edirik (v15 xəbərdarlığını silmək üçün)
 client.once('clientReady', (c) => {
     console.log(`Bot uğurla işə düşdü: ${c.user.tag}`);
 });
@@ -54,14 +54,9 @@ client.on('interactionCreate', async (interaction) => {
             .setCustomId(`modal_${type}`)
             .setTitle(`${type.charAt(0).toUpperCase() + type.slice(1)} Ticket`);
 
-        let questionLabel = 'Please describe your request:';
-        if (type === 'report') questionLabel = 'Who are you reporting and why?';
-        else if (type === 'suggestion') questionLabel = 'What is your suggestion?';
-        else if (type === 'question') questionLabel = 'What is your question?';
-
         const input = new TextInputBuilder()
             .setCustomId('user_input')
-            .setLabel(questionLabel)
+            .setLabel('Please describe your request:')
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true)
             .setMaxLength(1000);
@@ -89,13 +84,16 @@ client.on('interactionCreate', async (interaction) => {
 
             await ticketChannel.send({ 
                 content: `<@&${CONFIG.SUPPORT_ROLE}> | Ticket created by ${interaction.user}`, 
-                embeds: [new EmbedBuilder().setTitle(`New ${type.toUpperCase()} Ticket`).setDescription(`**User:** ${interaction.user}\n**Details:**\n${userInput}`).setColor(0x00FF00)] 
+                embeds: [new EmbedBuilder()
+                    .setTitle(`New ${type.toUpperCase()} Ticket`)
+                    .setDescription(`**User:** ${interaction.user}\n**Details:**\n${userInput}`)
+                    .setColor(0x00FF00)] 
             });
 
             await interaction.reply({ content: `✅ Your ticket has been created: ${ticketChannel}`, ephemeral: true });
         } catch (error) {
             console.error('Ticket yaratma xətası:', error);
-            await interaction.reply({ content: '❌ Error: Please check my permissions or Category ID.', ephemeral: true });
+            await interaction.reply({ content: '❌ Error: Could not create channel. Please check category ID and bot permissions.', ephemeral: true });
         }
     }
 });
