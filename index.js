@@ -1,15 +1,15 @@
 const { Client, GatewayIntentBits } = require('discord.js');
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const express = require('express');
 
+// Uptime üçün server
 const app = express();
 app.get('/', (req, res) => res.status(200).send('Bot is active!'));
 app.listen(process.env.PORT || 10000);
 
-// OpenAI konfiqurasiyası
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY, // Render-dəki dəyişənin adı bu olmalıdır!
-});
+// Gemini AI konfiqurasiyası
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const client = new Client({
     intents: [
@@ -27,16 +27,14 @@ client.on('messageCreate', async (message) => {
 
     try {
         message.channel.sendTyping();
-        const completion = await openai.chat.completions.create({
-            messages: [{ role: "user", content: prompt }],
-            model: "gpt-4o-mini",
-        });
-
-        const reply = completion.choices[0].message.content;
-        message.reply(reply.length > 2000 ? reply.substring(0, 1999) : reply);
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        message.reply(text.length > 2000 ? text.substring(0, 1999) : text);
     } catch (error) {
-        console.error('OpenAI Error:', error);
-        message.reply('API açarında və ya sorğuda xəta var. Xahiş edirəm API açarınızı yoxlayın.');
+        console.error('Gemini Error:', error);
+        message.reply('AI cavab verə bilmədi. Açarın düzgün olduğundan əmin olun.');
     }
 });
 
